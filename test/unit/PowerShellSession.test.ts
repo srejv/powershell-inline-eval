@@ -127,6 +127,26 @@ describe('PowerShellSession', () => {
     session.dispose();
   });
 
+  it('restarts the active session and rejects the in-flight request', async () => {
+    const child = new FakeChildProcess();
+    const outputChannel = createOutputChannel();
+    const session = new PowerShellSession(outputChannel.channel, createSettings, createSuccessfulSpawn(child), 50);
+    const execution = session.execute('Get-Date');
+
+    await waitForQueue();
+
+    assert.equal(session.getState().activeExecutable, 'pwsh');
+    assert.equal(session.getState().hasActiveProcess, true);
+
+    session.restart('Manual restart.');
+
+    await assert.rejects(execution, /Manual restart\./);
+    assert.equal(session.getState().activeExecutable, undefined);
+    assert.equal(session.getState().hasActiveProcess, false);
+    assert.equal(child.killed, true);
+    assert.match(outputChannel.text(), /Manual restart\./);
+  });
+
   it('uses the configured powershell executable preference', async () => {
     const spawnCalls: string[] = [];
     const outputChannel = createOutputChannel();

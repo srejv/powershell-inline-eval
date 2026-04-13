@@ -12,6 +12,7 @@ describe('Extension activation', () => {
     assert.ok(commands.includes('powershellContext.evaluateLine'));
     assert.ok(commands.includes('powershellContext.evaluateSelection'));
     assert.ok(commands.includes('powershellContext.evaluateFile'));
+    assert.ok(commands.includes('powershellContext.restartSession'));
     assert.ok(commands.includes('powershellContext.showLastResultPreview'));
     assert.ok(commands.includes('powershellContext.clearInlineResult'));
   });

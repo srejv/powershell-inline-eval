@@ -6,6 +6,8 @@ import {
   EVALUATE_LINE_COMMAND,
   EVALUATE_SELECTION_COMMAND,
   OUTPUT_CHANNEL_NAME,
+  RESTART_SESSION_COMMAND,
+  SETTINGS_SECTION,
   SHOW_LAST_RESULT_PREVIEW_COMMAND
 } from './constants';
 import {
@@ -16,14 +18,16 @@ import {
 import { PowerShellSession } from './powershell/PowerShellSession';
 import { InlineResultController } from './ui/InlineResultController';
 import { ResultPreviewPanel } from './ui/ResultPreviewPanel';
+import { SessionStatusBar } from './ui/SessionStatusBar';
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   const session = new PowerShellSession(outputChannel, getPowerShellContextSettings);
   const inlineResults = new InlineResultController();
   const previewPanel = new ResultPreviewPanel();
+  const sessionStatusBar = new SessionStatusBar(session);
 
-  context.subscriptions.push(outputChannel, session, inlineResults, previewPanel);
+  context.subscriptions.push(outputChannel, session, inlineResults, previewPanel, sessionStatusBar);
   context.subscriptions.push(
     vscode.commands.registerCommand(
       EVALUATE_LINE_COMMAND,
@@ -61,6 +65,13 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
   context.subscriptions.push(
+    vscode.commands.registerCommand(RESTART_SESSION_COMMAND, async () => {
+      session.restart();
+      sessionStatusBar.refresh();
+      await vscode.window.showInformationMessage('PowerShell session restarted.');
+    })
+  );
+  context.subscriptions.push(
     vscode.commands.registerCommand(SHOW_LAST_RESULT_PREVIEW_COMMAND, () => {
       previewPanel.showLatest();
     })
@@ -68,6 +79,19 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(CLEAR_INLINE_RESULT_COMMAND, () => {
       inlineResults.clear(vscode.window.activeTextEditor);
+    })
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(event => {
+      if (!event.affectsConfiguration(SETTINGS_SECTION)) {
+        return;
+      }
+
+      sessionStatusBar.refresh();
+
+      if (event.affectsConfiguration(`${SETTINGS_SECTION}.powerShellExecutable`)) {
+        session.restart('PowerShell session restarted after the engine setting changed.');
+      }
     })
   );
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as os from 'node:os';
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 import type { PowerShellContextSettings } from '../configurationModel';
 import {
   DEFAULT_INLINE_OUTPUT_MAX_LENGTH,
@@ -32,7 +32,16 @@ interface PendingRequest {
   reject: (error: Error) => void;
 }
 
+export interface PowerShellSessionState {
+  activeExecutable: string | undefined;
+  preferredExecutable: PowerShellContextSettings['powerShellExecutablePreference'];
+  hasActiveProcess: boolean;
+}
+
+type SessionStateListener = (state: PowerShellSessionState) => void;
+
 export class PowerShellSession implements vscode.Disposable {
+  private readonly stateListeners = new Set<SessionStateListener>();
   private process: ChildProcessWithoutNullStreams | undefined;
   private startPromise: Promise<void> | undefined;
   private readonly queuedRequests: PendingRequest[] = [];
@@ -48,6 +57,16 @@ export class PowerShellSession implements vscode.Disposable {
     private readonly spawnProcess: typeof spawn = spawn,
     private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS
   ) {}
+
+  public readonly onDidChangeState = (listener: SessionStateListener): vscode.Disposable => {
+    this.stateListeners.add(listener);
+
+    return {
+      dispose: () => {
+        this.stateListeners.delete(listener);
+      }
+    };
+  };
 
   public async execute(code: string): Promise<SessionExecutionResult> {
     return new Promise<SessionExecutionResult>((resolve, reject) => {
@@ -65,8 +84,29 @@ export class PowerShellSession implements vscode.Disposable {
     });
   }
 
-  public dispose(): void {
+  public getState(): PowerShellSessionState {
+    const settings = this.getSettings();
+
+    return {
+      activeExecutable: this.activeExecutable,
+      preferredExecutable: settings.powerShellExecutablePreference,
+      hasActiveProcess: this.process !== undefined
+    };
+  }
+
+  public restart(reason = 'PowerShell session restarted.'): void {
+    const restartError = new Error(reason);
+
+    this.rejectAllRequests(restartError);
+    this.outputChannel.appendLine(reason);
     this.stopProcess();
+    this.emitState();
+  }
+
+  public dispose(): void {
+    this.rejectAllRequests(new Error('PowerShell session disposed.'));
+    this.stopProcess();
+    this.stateListeners.clear();
   }
 
   private async runNextRequest(): Promise<void> {
@@ -160,6 +200,7 @@ export class PowerShellSession implements vscode.Disposable {
         this.attachProcess(child);
         child.stdin.write(`${buildBootstrapScript()}${os.EOL}`, 'utf8');
         child.off('error', handleError);
+        this.emitState();
         resolve();
       };
 
@@ -282,6 +323,7 @@ export class PowerShellSession implements vscode.Disposable {
       this.isStoppingProcess = false;
       this.stdoutBuffer = '';
       this.stderrBuffer = '';
+      this.emitState();
       return;
     }
 
@@ -292,6 +334,7 @@ export class PowerShellSession implements vscode.Disposable {
     this.startPromise = undefined;
     this.activeExecutable = undefined;
     this.outputChannel.appendLine(error.message);
+    this.emitState();
 
     if (this.activeRequest) {
       const activeRequest = this.activeRequest;
@@ -333,9 +376,23 @@ export class PowerShellSession implements vscode.Disposable {
     this.stderrBuffer = '';
   }
 
+  private rejectAllRequests(error: Error): void {
+    if (this.activeRequest) {
+      const activeRequest = this.activeRequest;
+      this.activeRequest = undefined;
+      activeRequest.reject(error);
+    }
+
+    while (this.queuedRequests.length > 0) {
+      const queuedRequest = this.queuedRequests.shift();
+      queuedRequest?.reject(error);
+    }
+  }
+
   private stopProcess(): void {
     if (!this.process) {
       this.activeExecutable = undefined;
+      this.emitState();
       return;
     }
 
@@ -345,6 +402,15 @@ export class PowerShellSession implements vscode.Disposable {
     this.process = undefined;
     this.startPromise = undefined;
     this.activeExecutable = undefined;
+    this.emitState();
+  }
+
+  private emitState(): void {
+    const state = this.getState();
+
+    for (const listener of this.stateListeners) {
+      listener(state);
+    }
   }
 }
 
