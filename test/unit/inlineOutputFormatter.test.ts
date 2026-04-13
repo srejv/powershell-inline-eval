@@ -16,6 +16,17 @@ describe('formatInlineOutput', () => {
     assert.equal(presentation.revealOutputChannel, false);
   });
 
+  it('prefers structured metadata previews when available', () => {
+    const presentation = formatInlineOutput('raw output', {
+      kind: 'object',
+      preview: '{ Name: alpha, Id: 42 }',
+      itemCount: 1
+    });
+
+    assert.equal(presentation.text, '{ Name: alpha, Id: 42 }');
+    assert.equal(presentation.revealOutputChannel, false);
+  });
+
   it('summarizes property-list output', () => {
     const presentation = formatInlineOutput('Name : alpha\nId : 42\nState : Running');
 
@@ -40,7 +51,7 @@ describe('formatInlineOutput', () => {
   });
 
   it('truncates long single-line output', () => {
-    const presentation = formatInlineOutput('abcdefghijklmnopqrstuvwxyz', 10);
+    const presentation = formatInlineOutput('abcdefghijklmnopqrstuvwxyz', undefined, 10);
 
     assert.equal(presentation.text, 'abcdefg...');
     assert.equal(presentation.revealOutputChannel, true);

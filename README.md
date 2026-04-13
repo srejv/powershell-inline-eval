@@ -10,6 +10,7 @@ PowerShell Context is a VS Code extension that evaluates PowerShell code in a pe
 - Keep a dedicated PowerShell session alive between evaluations.
 - Preserve multiple inline results in the same editor instead of replacing the previous result.
 - Summarize object-style and multi-line output inline instead of flattening everything into one raw string.
+- Use execution-time metadata to preview PSCustomObject, hashtable, and collection results more predictably.
 - Send large output and errors to a dedicated output channel.
 
 ## Development

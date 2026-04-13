@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as vscode from 'vscode';
+import { EXECUTION_METADATA_MARKER } from '../../src/constants';
 import { PowerShellSession } from '../../src/powershell/PowerShellSession';
 
 class FakeChildProcess extends EventEmitter {
@@ -92,6 +93,36 @@ describe('PowerShellSession', () => {
     const result = await execution;
     assert.equal(result.isError, true);
     assert.match(result.output, /stderr failure/);
+    session.dispose();
+  });
+
+  it('parses structured output metadata from the PowerShell stream', async () => {
+    const child = new FakeChildProcess();
+    const session = new PowerShellSession(createOutputChannel().channel, createSuccessfulSpawn(child), 50);
+    const execution = session.execute('Get-Process | Select-Object -First 1');
+
+    await waitForQueue();
+    const requestId = extractRequestId(child.writes[1]);
+    const metadata = Buffer.from(
+      JSON.stringify({
+        kind: 'object',
+        preview: '{ Name: pwsh, Id: 1234 }',
+        itemCount: 1
+      }),
+      'utf8'
+    ).toString('base64');
+
+    child.stdout.write(
+      `__PSCTX_START__${requestId}\nprocess text\n${EXECUTION_METADATA_MARKER}${requestId}:${metadata}\n__PSCTX_END__${requestId}\n`
+    );
+
+    const result = await execution;
+    assert.equal(result.output, 'process text');
+    assert.deepEqual(result.metadata, {
+      kind: 'object',
+      preview: '{ Name: pwsh, Id: 1234 }',
+      itemCount: 1
+    });
     session.dispose();
   });
 });

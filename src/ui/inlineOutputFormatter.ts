@@ -1,5 +1,5 @@
 import { INLINE_OUTPUT_MAX_LENGTH } from '../constants';
-import type { InlinePresentation } from '../types';
+import type { InlinePresentation, SessionOutputMetadata } from '../types';
 
 const ELLIPSIS = '...';
 const EMPTY_OUTPUT_LABEL = '(no output)';
@@ -14,7 +14,15 @@ interface TableColumnRange {
   end: number;
 }
 
-export function formatInlineOutput(output: string, maxLength = INLINE_OUTPUT_MAX_LENGTH): InlinePresentation {
+export function formatInlineOutput(
+  output: string,
+  metadata?: SessionOutputMetadata,
+  maxLength = INLINE_OUTPUT_MAX_LENGTH
+): InlinePresentation {
+  if (metadata?.preview.trim()) {
+    return createBoundedPresentation(metadata.preview.trim(), maxLength, shouldRevealOutputChannel(metadata));
+  }
+
   const lines = getMeaningfulLines(output);
 
   if (lines.length === 0) {
@@ -182,6 +190,10 @@ function truncate(text: string, maxLength: number): string {
 
 function pluralize(word: string, count: number): string {
   return count === 1 ? word : `${word}s`;
+}
+
+function shouldRevealOutputChannel(metadata: SessionOutputMetadata): boolean {
+  return metadata.kind === 'collection' && metadata.itemCount > 1;
 }
 
 function isDefined<T>(value: T | undefined): value is T {

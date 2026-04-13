@@ -77,7 +77,7 @@ function createEvaluateCommand(
 
     try {
       const result = await dependencies.session.execute(execution.code);
-      const inlinePresentation = formatInlineOutput(result.output);
+      const inlinePresentation = formatInlineOutput(result.output, result.metadata);
       dependencies.outputChannel.append(formatOutputChannelEntry(execution, result));
       dependencies.inlineResults.show(editor, execution.lineNumber, inlinePresentation.text, result.output, result.isError);
 

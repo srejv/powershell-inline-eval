@@ -5,11 +5,12 @@ import * as vscode from 'vscode';
 import {
   EXECUTION_END_MARKER,
   EXECUTION_ERROR_MARKER,
+  EXECUTION_METADATA_MARKER,
   EXECUTION_START_MARKER,
   POWERSHELL_BOOT_TIMEOUT_MS,
   OUTPUT_STRING_WIDTH
 } from '../constants';
-import type { SessionExecutionResult } from '../types';
+import type { SessionExecutionResult, SessionOutputMetadata } from '../types';
 import { buildBootstrapScript, buildEvaluationScript } from './powerShellScriptBuilder';
 
 interface PendingRequest {
@@ -17,6 +18,7 @@ interface PendingRequest {
   code: string;
   startedAt: number;
   lines: string[];
+  metadata?: SessionOutputMetadata;
   isCapturing: boolean;
   isError: boolean;
   resolve: (result: SessionExecutionResult) => void;
@@ -209,6 +211,13 @@ export class PowerShellSession implements vscode.Disposable {
       return;
     }
 
+    const metadataPrefix = `${EXECUTION_METADATA_MARKER}${request.requestId}:`;
+
+    if (line.startsWith(metadataPrefix)) {
+      request.metadata = parseOutputMetadata(line.slice(metadataPrefix.length));
+      return;
+    }
+
     if (line === `${EXECUTION_END_MARKER}${request.requestId}`) {
       this.completeActiveRequest();
       return;
@@ -240,7 +249,8 @@ export class PowerShellSession implements vscode.Disposable {
       code: request.code,
       output: trimTrailingWhitespace(request.lines.join(os.EOL)),
       isError: request.isError,
-      durationMs: Date.now() - request.startedAt
+      durationMs: Date.now() - request.startedAt,
+      metadata: request.metadata
     });
     void this.runNextRequest();
   }
@@ -311,4 +321,30 @@ function splitBufferedLines(buffer: string): string[] {
     .split(/\r?\n/)
     .map(line => line.trimEnd())
     .filter(line => line.length > 0);
+}
+
+function parseOutputMetadata(encodedMetadata: string): SessionOutputMetadata | undefined {
+  try {
+    const parsed = JSON.parse(Buffer.from(encodedMetadata, 'base64').toString('utf8')) as Partial<SessionOutputMetadata>;
+
+    if (!isSessionOutputKind(parsed.kind)) {
+      return undefined;
+    }
+
+    if (typeof parsed.preview !== 'string' || typeof parsed.itemCount !== 'number') {
+      return undefined;
+    }
+
+    return {
+      kind: parsed.kind,
+      preview: parsed.preview,
+      itemCount: parsed.itemCount
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function isSessionOutputKind(value: unknown): value is SessionOutputMetadata['kind'] {
+  return value === 'empty' || value === 'scalar' || value === 'dictionary' || value === 'object' || value === 'collection';
 }
