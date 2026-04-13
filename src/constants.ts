@@ -1,0 +1,11 @@
+export const EXTENSION_NAME = 'PowerShell Context';
+export const OUTPUT_CHANNEL_NAME = EXTENSION_NAME;
+export const EVALUATE_LINE_COMMAND = 'powershellContext.evaluateLine';
+export const CLEAR_INLINE_RESULT_COMMAND = 'powershellContext.clearInlineResult';
+export const INLINE_OUTPUT_MAX_LENGTH = 72;
+export const OUTPUT_STRING_WIDTH = 160;
+export const EXECUTION_START_MARKER = '__PSCTX_START__';
+export const EXECUTION_END_MARKER = '__PSCTX_END__';
+export const EXECUTION_ERROR_MARKER = '__PSCTX_ERROR__';
+export const POWERSHELL_BOOT_TIMEOUT_MS = 10000;
+export const RESULT_SUFFIX_MARGIN = '0 0 0 1rem';

@@ -1,0 +1,61 @@
+{
+  "name": "powershell-context",
+  "displayName": "PowerShell Context",
+  "description": "Evaluate the current PowerShell line and show inline results in the editor.",
+  "version": "0.0.1",
+  "publisher": "srejv",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:powershellContext.evaluateLine",
+    "onCommand:powershellContext.clearInlineResult"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "powershellContext.evaluateLine",
+        "title": "Evaluate Current PowerShell Line",
+        "category": "PowerShell Context"
+      },
+      {
+        "command": "powershellContext.clearInlineResult",
+        "title": "Clear Inline PowerShell Result",
+        "category": "PowerShell Context"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "powershellContext.evaluateLine",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && editorLangId == powershell"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src test --ext .ts",
+    "pretest": "npm run compile && npm run lint",
+    "test": "npm run test:unit && npm run test:extension",
+    "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
+    "test:extension": "node ./out/test/extension/runTest.js"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.3",
+    "@types/vscode": "^1.99.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "mocha": "^11.2.2",
+    "typescript": "^5.8.3"
+  }
+}
