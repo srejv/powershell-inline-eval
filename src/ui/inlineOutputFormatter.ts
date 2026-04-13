@@ -19,11 +19,11 @@ export function formatInlineOutput(
   metadata?: SessionOutputMetadata,
   maxLength = DEFAULT_INLINE_OUTPUT_MAX_LENGTH
 ): InlinePresentation {
-  if (metadata?.preview.trim()) {
+  const lines = getMeaningfulLines(output);
+
+  if (shouldUseMetadataPreview(metadata, lines)) {
     return createBoundedPresentation(metadata.preview.trim(), maxLength, shouldRevealOutputChannel(metadata));
   }
-
-  const lines = getMeaningfulLines(output);
 
   if (lines.length === 0) {
     return {
@@ -194,6 +194,20 @@ function pluralize(word: string, count: number): string {
 
 function shouldRevealOutputChannel(metadata: SessionOutputMetadata): boolean {
   return metadata.kind === 'collection' && metadata.itemCount > 1;
+}
+
+function shouldUseMetadataPreview(metadata: SessionOutputMetadata | undefined, lines: string[]): metadata is SessionOutputMetadata {
+  if (!metadata?.preview.trim()) {
+    return false;
+  }
+
+  const normalizedPreview = metadata.preview.trim();
+
+  if (lines.length > 0 && (metadata.kind === 'empty' || normalizedPreview === EMPTY_OUTPUT_LABEL)) {
+    return false;
+  }
+
+  return true;
 }
 
 function isDefined<T>(value: T | undefined): value is T {

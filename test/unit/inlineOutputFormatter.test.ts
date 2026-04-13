@@ -27,6 +27,17 @@ describe('formatInlineOutput', () => {
     assert.equal(presentation.revealOutputChannel, false);
   });
 
+  it('falls back to raw output when metadata reports empty output incorrectly', () => {
+    const presentation = formatInlineOutput('Current working directory: C:/Development', {
+      kind: 'empty',
+      preview: '(no output)',
+      itemCount: 0
+    });
+
+    assert.equal(presentation.text, 'Current working directory: C:/Development');
+    assert.equal(presentation.revealOutputChannel, false);
+  });
+
   it('summarizes property-list output', () => {
     const presentation = formatInlineOutput('Name : alpha\nId : 42\nState : Running');
 
