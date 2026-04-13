@@ -13,6 +13,8 @@
   ],
   "activationEvents": [
     "onCommand:powershellContext.evaluateLine",
+    "onCommand:powershellContext.evaluateSelection",
+    "onCommand:powershellContext.evaluateFile",
     "onCommand:powershellContext.clearInlineResult"
   ],
   "main": "./out/src/extension.js",
@@ -21,6 +23,16 @@
       {
         "command": "powershellContext.evaluateLine",
         "title": "Evaluate Current PowerShell Line",
+        "category": "PowerShell Context"
+      },
+      {
+        "command": "powershellContext.evaluateSelection",
+        "title": "Evaluate PowerShell Selection",
+        "category": "PowerShell Context"
+      },
+      {
+        "command": "powershellContext.evaluateFile",
+        "title": "Evaluate PowerShell File",
         "category": "PowerShell Context"
       },
       {
@@ -35,6 +47,12 @@
         "key": "ctrl+enter",
         "mac": "cmd+enter",
         "when": "editorTextFocus && editorLangId == powershell"
+      },
+      {
+        "command": "powershellContext.evaluateSelection",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus && editorLangId == powershell && editorHasSelection"
       }
     ]
   },

@@ -1,10 +1,16 @@
 import * as vscode from 'vscode';
 import {
   CLEAR_INLINE_RESULT_COMMAND,
+  EVALUATE_FILE_COMMAND,
   EVALUATE_LINE_COMMAND,
+  EVALUATE_SELECTION_COMMAND,
   OUTPUT_CHANNEL_NAME
 } from './constants';
-import { createEvaluateLineCommand } from './commands/evaluateLineCommand';
+import {
+  createEvaluateFileCommand,
+  createEvaluateLineCommand,
+  createEvaluateSelectionCommand
+} from './commands/evaluateLineCommand';
 import { PowerShellSession } from './powershell/PowerShellSession';
 import { InlineResultController } from './ui/InlineResultController';
 
@@ -18,6 +24,26 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       EVALUATE_LINE_COMMAND,
       createEvaluateLineCommand({
+        session,
+        inlineResults,
+        outputChannel
+      })
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      EVALUATE_SELECTION_COMMAND,
+      createEvaluateSelectionCommand({
+        session,
+        inlineResults,
+        outputChannel
+      })
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      EVALUATE_FILE_COMMAND,
+      createEvaluateFileCommand({
         session,
         inlineResults,
         outputChannel

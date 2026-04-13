@@ -5,6 +5,11 @@ const SUCCESS_PREFIX = ' => ';
 const ERROR_PREFIX = ' !! ';
 const EMPTY_OUTPUT_LABEL = '(no output)';
 
+interface EditorDecorationState {
+  successDecorations: Map<number, vscode.DecorationOptions>;
+  errorDecorations: Map<number, vscode.DecorationOptions>;
+}
+
 export class InlineResultController implements vscode.Disposable {
   private readonly successDecorationType = vscode.window.createTextEditorDecorationType({
     after: {
@@ -22,7 +27,7 @@ export class InlineResultController implements vscode.Disposable {
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
   });
 
-  private activeEditor: vscode.TextEditor | undefined;
+  private readonly editorStates = new Map<vscode.TextEditor, EditorDecorationState>();
 
   public show(
     editor: vscode.TextEditor,
@@ -42,36 +47,83 @@ export class InlineResultController implements vscode.Disposable {
       }
     };
 
-    this.clear(editor);
-    this.activeEditor = editor;
+    const state = this.getOrCreateState(editor);
+
+    state.successDecorations.delete(lineNumber);
+    state.errorDecorations.delete(lineNumber);
 
     if (isError) {
-      editor.setDecorations(this.successDecorationType, []);
-      editor.setDecorations(this.errorDecorationType, [decoration]);
+      state.errorDecorations.set(lineNumber, decoration);
+      this.render(editor, state);
       return;
     }
 
-    editor.setDecorations(this.errorDecorationType, []);
-    editor.setDecorations(this.successDecorationType, [decoration]);
+    state.successDecorations.set(lineNumber, decoration);
+    this.render(editor, state);
   }
 
-  public clear(editor = this.activeEditor): void {
+  public clear(editor?: vscode.TextEditor, lineNumber?: number): void {
     if (!editor) {
+      for (const [storedEditor] of this.editorStates) {
+        this.clear(storedEditor);
+      }
       return;
     }
 
-    editor.setDecorations(this.successDecorationType, []);
-    editor.setDecorations(this.errorDecorationType, []);
+    const state = this.editorStates.get(editor);
 
-    if (editor === this.activeEditor) {
-      this.activeEditor = undefined;
+    if (!state) {
+      editor.setDecorations(this.successDecorationType, []);
+      editor.setDecorations(this.errorDecorationType, []);
+      return;
     }
+
+    if (lineNumber === undefined) {
+      state.successDecorations.clear();
+      state.errorDecorations.clear();
+      this.editorStates.delete(editor);
+      editor.setDecorations(this.successDecorationType, []);
+      editor.setDecorations(this.errorDecorationType, []);
+      return;
+    }
+
+    state.successDecorations.delete(lineNumber);
+    state.errorDecorations.delete(lineNumber);
+    this.render(editor, state);
   }
 
   public dispose(): void {
     this.clear();
     this.successDecorationType.dispose();
     this.errorDecorationType.dispose();
+  }
+
+  private getOrCreateState(editor: vscode.TextEditor): EditorDecorationState {
+    const existingState = this.editorStates.get(editor);
+
+    if (existingState) {
+      return existingState;
+    }
+
+    const newState: EditorDecorationState = {
+      successDecorations: new Map<number, vscode.DecorationOptions>(),
+      errorDecorations: new Map<number, vscode.DecorationOptions>()
+    };
+
+    this.editorStates.set(editor, newState);
+    return newState;
+  }
+
+  private render(editor: vscode.TextEditor, state: EditorDecorationState): void {
+    const successDecorations = Array.from(state.successDecorations.values());
+    const errorDecorations = Array.from(state.errorDecorations.values());
+
+    editor.setDecorations(this.successDecorationType, successDecorations);
+    editor.setDecorations(this.errorDecorationType, errorDecorations);
+
+    if (successDecorations.length === 0 && errorDecorations.length === 0) {
+      this.editorStates.delete(editor);
+    }
   }
 }
 

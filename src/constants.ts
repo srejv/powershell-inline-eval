@@ -1,6 +1,8 @@
 export const EXTENSION_NAME = 'PowerShell Context';
 export const OUTPUT_CHANNEL_NAME = EXTENSION_NAME;
 export const EVALUATE_LINE_COMMAND = 'powershellContext.evaluateLine';
+export const EVALUATE_SELECTION_COMMAND = 'powershellContext.evaluateSelection';
+export const EVALUATE_FILE_COMMAND = 'powershellContext.evaluateFile';
 export const CLEAR_INLINE_RESULT_COMMAND = 'powershellContext.clearInlineResult';
 export const INLINE_OUTPUT_MAX_LENGTH = 72;
 export const OUTPUT_STRING_WIDTH = 160;

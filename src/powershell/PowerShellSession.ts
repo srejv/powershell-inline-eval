@@ -6,6 +6,7 @@ import {
   EXECUTION_END_MARKER,
   EXECUTION_ERROR_MARKER,
   EXECUTION_START_MARKER,
+  POWERSHELL_BOOT_TIMEOUT_MS,
   OUTPUT_STRING_WIDTH
 } from '../constants';
 import type { SessionExecutionResult } from '../types';
@@ -34,7 +35,8 @@ export class PowerShellSession implements vscode.Disposable {
 
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
-    private readonly spawnProcess: typeof spawn = spawn
+    private readonly spawnProcess: typeof spawn = spawn,
+    private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS
   ) {}
 
   public async execute(code: string): Promise<SessionExecutionResult> {
@@ -66,7 +68,16 @@ export class PowerShellSession implements vscode.Disposable {
       return;
     }
 
-    await this.ensureStarted();
+    try {
+      await this.ensureStarted();
+    } catch (error) {
+      this.rejectQueuedRequests(toError(error));
+      return;
+    }
+
+    if (this.activeRequest || this.queuedRequests.length === 0) {
+      return;
+    }
 
     const nextRequest = this.queuedRequests.shift();
 
@@ -114,8 +125,15 @@ export class PowerShellSession implements vscode.Disposable {
         stdio: 'pipe',
         windowsHide: true
       });
+      const timeoutHandle = setTimeout(() => {
+        child.off('spawn', handleSpawn);
+        child.off('error', handleError);
+        child.kill();
+        reject(new Error(`Timed out while starting ${executable}.`));
+      }, this.bootTimeoutMs);
 
       const handleSpawn = (): void => {
+        clearTimeout(timeoutHandle);
         child.stdout.setEncoding('utf8');
         child.stderr.setEncoding('utf8');
         this.attachProcess(child);
@@ -125,6 +143,7 @@ export class PowerShellSession implements vscode.Disposable {
       };
 
       const handleError = (error: Error): void => {
+        clearTimeout(timeoutHandle);
         child.off('spawn', handleSpawn);
         reject(error);
       };
@@ -229,8 +248,10 @@ export class PowerShellSession implements vscode.Disposable {
   private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
     const error = new Error(`PowerShell session exited unexpectedly (code: ${code ?? 'null'}, signal: ${signal ?? 'none'}).`);
 
+    this.flushPendingBuffers();
     this.process = undefined;
     this.startPromise = undefined;
+    this.outputChannel.appendLine(error.message);
 
     if (this.activeRequest) {
       const activeRequest = this.activeRequest;
@@ -243,6 +264,34 @@ export class PowerShellSession implements vscode.Disposable {
       queuedRequest?.reject(error);
     }
   }
+
+  private rejectQueuedRequests(error: Error): void {
+    this.outputChannel.appendLine(error.message);
+
+    while (this.queuedRequests.length > 0) {
+      const queuedRequest = this.queuedRequests.shift();
+      queuedRequest?.reject(error);
+    }
+  }
+
+  private flushPendingBuffers(): void {
+    if (!this.activeRequest) {
+      this.stdoutBuffer = '';
+      this.stderrBuffer = '';
+      return;
+    }
+
+    for (const line of splitBufferedLines(this.stdoutBuffer)) {
+      this.handleOutputLine(line);
+    }
+
+    for (const line of splitBufferedLines(this.stderrBuffer)) {
+      this.handleErrorLine(line);
+    }
+
+    this.stdoutBuffer = '';
+    this.stderrBuffer = '';
+  }
 }
 
 function trimTrailingWhitespace(text: string): string {
@@ -251,4 +300,15 @@ function trimTrailingWhitespace(text: string): string {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function splitBufferedLines(buffer: string): string[] {
+  if (buffer.length === 0) {
+    return [];
+  }
+
+  return buffer
+    .split(/\r?\n/)
+    .map(line => line.trimEnd())
+    .filter(line => line.length > 0);
 }

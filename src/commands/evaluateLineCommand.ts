@@ -2,7 +2,13 @@ import * as vscode from 'vscode';
 import type { PowerShellSession } from '../powershell/PowerShellSession';
 import { formatInlineOutput } from '../ui/inlineOutputFormatter';
 import type { InlineResultController } from '../ui/InlineResultController';
-import { formatOutputChannelEntry, getCurrentLineExecution } from './evaluateLineContext';
+import {
+  formatOutputChannelEntry,
+  getCurrentLineExecution,
+  getDocumentExecution,
+  getSelectionExecution,
+  type LineExecutionContext
+} from './evaluateLineContext';
 
 interface EvaluateLineDependencies {
   session: PowerShellSession;
@@ -13,23 +19,59 @@ interface EvaluateLineDependencies {
 export function createEvaluateLineCommand(
   dependencies: EvaluateLineDependencies
 ): () => Promise<void> {
+  return createEvaluateCommand(
+    dependencies,
+    getCurrentLineExecution,
+    'Open a PowerShell document to evaluate a line.',
+    'The current line is empty.'
+  );
+}
+
+export function createEvaluateSelectionCommand(
+  dependencies: EvaluateLineDependencies
+): () => Promise<void> {
+  return createEvaluateCommand(
+    dependencies,
+    getSelectionExecution,
+    'Open a PowerShell document to evaluate a selection.',
+    'Select some PowerShell code before running selection evaluation.'
+  );
+}
+
+export function createEvaluateFileCommand(
+  dependencies: EvaluateLineDependencies
+): () => Promise<void> {
+  return createEvaluateCommand(
+    dependencies,
+    getDocumentExecution,
+    'Open a PowerShell document to evaluate the file.',
+    'The current PowerShell document is empty.'
+  );
+}
+
+function createEvaluateCommand(
+  dependencies: EvaluateLineDependencies,
+  getExecution: (editor: vscode.TextEditor) => LineExecutionContext | undefined,
+  missingEditorMessage: string,
+  missingCodeMessage: string
+): () => Promise<void> {
   return async (): Promise<void> => {
     const editor = vscode.window.activeTextEditor;
 
     if (!editor) {
-      await vscode.window.showInformationMessage('Open a PowerShell document to evaluate a line.');
+      await vscode.window.showInformationMessage(missingEditorMessage);
       return;
     }
 
     if (editor.document.languageId !== 'powershell') {
-      await vscode.window.showInformationMessage('Line evaluation is only enabled for PowerShell documents.');
+      await vscode.window.showInformationMessage('PowerShell evaluation is only enabled for PowerShell documents.');
       return;
     }
 
-    const execution = getCurrentLineExecution(editor);
+    const execution = getExecution(editor);
 
     if (!execution) {
-      await vscode.window.showInformationMessage('The current line is empty.');
+      await vscode.window.showInformationMessage(missingCodeMessage);
       return;
     }
 
