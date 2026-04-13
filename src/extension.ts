@@ -11,20 +11,26 @@ import {
   SHOW_SESSION_INFO_COMMAND,
   SHOW_LAST_RESULT_PREVIEW_COMMAND
 } from './constants';
+import { clearLastEvaluationSnapshot, getLastEvaluationSnapshot } from './extensionDebugState';
 import {
   createEvaluateFileCommand,
   createEvaluateLineCommand,
   createEvaluateSelectionCommand
 } from './commands/evaluateLineCommand';
 import { PowerShellSession } from './powershell/PowerShellSession';
+import { getSessionFactoryForTests } from './extensionTestHooks';
 import { formatSessionInfo } from './sessionInfo';
 import { InlineResultController } from './ui/InlineResultController';
 import { ResultPreviewPanel } from './ui/ResultPreviewPanel';
 import { SessionStatusBar } from './ui/SessionStatusBar';
 
 export function activate(context: vscode.ExtensionContext): void {
+  clearLastEvaluationSnapshot();
   const outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
-  const session = new PowerShellSession(outputChannel, getPowerShellContextSettings);
+  const sessionFactory = getSessionFactoryForTests();
+  const session = sessionFactory
+    ? sessionFactory(outputChannel, getPowerShellContextSettings)
+    : new PowerShellSession(outputChannel, getPowerShellContextSettings);
   const inlineResults = new InlineResultController();
   const previewPanel = new ResultPreviewPanel();
   const sessionStatusBar = new SessionStatusBar(session);
@@ -110,4 +116,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // VS Code disposes subscriptions registered during activation.
+}
+
+export function getExtensionDebugState(): { lastEvaluation: ReturnType<typeof getLastEvaluationSnapshot> } {
+  return {
+    lastEvaluation: getLastEvaluationSnapshot()
+  };
 }

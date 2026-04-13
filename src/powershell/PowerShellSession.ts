@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import type * as vscode from 'vscode';
 import type { PowerShellContextSettings } from '../configurationModel';
 import {
@@ -18,7 +20,7 @@ import {
   OUTPUT_STRING_WIDTH
 } from '../constants';
 import type { SessionExecutionResult, SessionOutputMetadata } from '../types';
-import { buildBootstrapScript, buildEvaluationScript } from './powerShellScriptBuilder';
+import { buildEvaluationRequest } from './powerShellScriptBuilder';
 
 interface PendingRequest {
   requestId: string;
@@ -40,7 +42,14 @@ export interface PowerShellSessionState {
 
 type SessionStateListener = (state: PowerShellSessionState) => void;
 
-export class PowerShellSession implements vscode.Disposable {
+export interface PowerShellSessionLike extends vscode.Disposable {
+  execute(code: string): Promise<SessionExecutionResult>;
+  getState(): PowerShellSessionState;
+  restart(reason?: string): void;
+  onDidChangeState(listener: SessionStateListener): vscode.Disposable;
+}
+
+export class PowerShellSession implements PowerShellSessionLike {
   private readonly stateListeners = new Set<SessionStateListener>();
   private process: ChildProcessWithoutNullStreams | undefined;
   private startPromise: Promise<void> | undefined;
@@ -55,7 +64,9 @@ export class PowerShellSession implements vscode.Disposable {
     private readonly outputChannel: vscode.OutputChannel,
     private readonly getSettings: () => PowerShellContextSettings = getDefaultSettings,
     private readonly spawnProcess: typeof spawn = spawn,
-    private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS
+    private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS,
+    private readonly runnerScriptPath = path.resolve(__dirname, '../../../powershell/PowerShellContextRunner.ps1'),
+    private readonly requestDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-context-'))
   ) {}
 
   public readonly onDidChangeState = (listener: SessionStateListener): vscode.Disposable => {
@@ -107,6 +118,7 @@ export class PowerShellSession implements vscode.Disposable {
     this.rejectAllRequests(new Error('PowerShell session disposed.'));
     this.stopProcess();
     this.stateListeners.clear();
+    fs.rmSync(this.requestDirectoryPath, { recursive: true, force: true });
   }
 
   private async runNextRequest(): Promise<void> {
@@ -133,14 +145,14 @@ export class PowerShellSession implements vscode.Disposable {
 
     this.activeRequest = nextRequest;
     const settings = this.getSettings();
-    const script = buildEvaluationScript(
+    const requestPayload = buildEvaluationRequest(
       nextRequest.code,
       nextRequest.requestId,
       OUTPUT_STRING_WIDTH,
       settings.previewItemLimit,
       settings.previewDepth
     );
-    this.process.stdin.write(`${script}${os.EOL}`, 'utf8');
+    fs.writeFileSync(path.join(this.requestDirectoryPath, `${nextRequest.requestId}.request`), requestPayload, 'utf8');
   }
 
   private async ensureStarted(): Promise<void> {
@@ -181,10 +193,14 @@ export class PowerShellSession implements vscode.Disposable {
 
   private async startWithExecutable(executable: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      const child = this.spawnProcess(executable, ['-NoLogo', '-NoProfile', '-NoExit', '-Command', '-'], {
-        stdio: 'pipe',
-        windowsHide: true
-      });
+      const child = this.spawnProcess(
+        executable,
+        ['-NoLogo', '-NoProfile', '-File', this.runnerScriptPath, '-RequestDirectory', this.requestDirectoryPath],
+        {
+          stdio: 'pipe',
+          windowsHide: true
+        }
+      );
       const timeoutHandle = setTimeout(() => {
         child.off('spawn', handleSpawn);
         child.off('error', handleError);
@@ -198,7 +214,6 @@ export class PowerShellSession implements vscode.Disposable {
         child.stderr.setEncoding('utf8');
         this.activeExecutable = executable;
         this.attachProcess(child);
-        child.stdin.write(`${buildBootstrapScript()}${os.EOL}`, 'utf8');
         child.off('error', handleError);
         this.emitState();
         resolve();

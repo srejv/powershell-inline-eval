@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { RESTART_SESSION_COMMAND } from '../constants';
-import type { PowerShellSession, PowerShellSessionState } from '../powershell/PowerShellSession';
+import type { PowerShellSessionLike, PowerShellSessionState } from '../powershell/PowerShellSession';
 
 const ACTIVE_ICON = '$(terminal-powershell)';
 const IDLE_ICON = '$(circle-large-outline)';
@@ -9,7 +9,7 @@ export class SessionStatusBar implements vscode.Disposable {
   private readonly statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   private readonly stateSubscription: vscode.Disposable;
 
-  constructor(private readonly session: PowerShellSession) {
+  constructor(private readonly session: PowerShellSessionLike) {
     this.statusBarItem.command = RESTART_SESSION_COMMAND;
     this.stateSubscription = this.session.onDidChangeState(state => {
       this.render(state);

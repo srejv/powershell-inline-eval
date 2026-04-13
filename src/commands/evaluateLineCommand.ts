@@ -4,7 +4,8 @@ import type {
   PowerShellContextSettings,
   PreviewPanelAutoOpenMode
 } from '../configuration';
-import type { PowerShellSession } from '../powershell/PowerShellSession';
+import { setLastEvaluationSnapshot } from '../extensionDebugState';
+import type { PowerShellSessionLike } from '../powershell/PowerShellSession';
 import { formatInlineOutput } from '../ui/inlineOutputFormatter';
 import type { InlineResultController } from '../ui/InlineResultController';
 import type { ResultPreviewPanel } from '../ui/ResultPreviewPanel';
@@ -17,7 +18,7 @@ import {
 } from './evaluateLineContext';
 
 interface EvaluateLineDependencies {
-  session: PowerShellSession;
+  session: PowerShellSessionLike;
   inlineResults: InlineResultController;
   previewPanel: ResultPreviewPanel;
   outputChannel: vscode.OutputChannel;
@@ -87,6 +88,7 @@ function createEvaluateCommand(
       const result = await dependencies.session.execute(execution.code);
       const settings = dependencies.getSettings();
       const inlinePresentation = formatInlineOutput(result.output, result.metadata, settings.inlineOutputMaxLength);
+      setLastEvaluationSnapshot({ execution, result });
       dependencies.outputChannel.append(formatOutputChannelEntry(execution, result));
       dependencies.previewPanel.update(execution, result);
       dependencies.inlineResults.show(editor, execution.lineNumber, inlinePresentation.text, result.output, result.isError);
@@ -101,6 +103,15 @@ function createEvaluateCommand(
     } catch (error) {
       const settings = dependencies.getSettings();
       const message = error instanceof Error ? error.message : String(error);
+      setLastEvaluationSnapshot({
+        execution,
+        result: {
+          code: execution.code,
+          output: message,
+          isError: true,
+          durationMs: 0
+        }
+      });
       dependencies.inlineResults.show(editor, execution.lineNumber, message, message, true);
       dependencies.outputChannel.appendLine(message);
 
@@ -112,7 +123,7 @@ function createEvaluateCommand(
 }
 
 function shouldOpenPreviewPanel(
-  result: Awaited<ReturnType<PowerShellSession['execute']>>,
+  result: Awaited<ReturnType<PowerShellSessionLike['execute']>>,
   hasExpandedInlineOutput: boolean,
   autoOpenMode: PreviewPanelAutoOpenMode
 ): boolean {

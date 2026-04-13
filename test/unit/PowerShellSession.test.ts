@@ -1,5 +1,8 @@
 import * as assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as vscode from 'vscode';
@@ -35,6 +38,7 @@ describe('PowerShellSession', () => {
   it('rejects queued requests when PowerShell startup fails', async () => {
     const spawnCalls: string[] = [];
     const outputChannel = createOutputChannel();
+    const requestDirectory = createRequestDirectory();
     const spawnProcess = ((file: string) => {
       spawnCalls.push(file);
       const child = new FakeChildProcess();
@@ -43,24 +47,34 @@ describe('PowerShellSession', () => {
       });
       return child as unknown as ChildProcessWithoutNullStreams;
     }) as typeof import('node:child_process').spawn;
-    const session = new PowerShellSession(outputChannel.channel, createSettings, spawnProcess, 50);
+    const session = new PowerShellSession(outputChannel.channel, createSettings, spawnProcess, 50, undefined, requestDirectory);
 
     await assert.rejects(session.execute('Get-Date'), /failed to start/);
     assert.deepEqual(spawnCalls, ['pwsh', 'powershell']);
     assert.match(outputChannel.text(), /failed to start/);
+    session.dispose();
   });
 
   it('processes queued requests sequentially', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
+    const requestDirectory = createRequestDirectory();
+    const session = new PowerShellSession(
+      createOutputChannel().channel,
+      createSettings,
+      createSuccessfulSpawn(child),
+      50,
+      undefined,
+      requestDirectory
+    );
     const firstExecution = session.execute("Write-Output 'one'");
     const secondExecution = session.execute("Write-Output 'two'");
 
     await waitForQueue();
-    assert.equal(child.writes.length, 2);
-    assert.match(child.writes[1], /V3JpdGUtT3V0cHV0ICdvbmUn/);
+    const firstPayload = consumeRequestPayload(requestDirectory);
+    assert.equal(firstPayload.requestId.length > 0, true);
+    assert.equal(Buffer.from(firstPayload.codeBase64, 'base64').toString('utf8'), "Write-Output 'one'");
 
-    const firstRequestId = extractRequestId(child.writes[1]);
+    const firstRequestId = firstPayload.requestId;
     child.stdout.write(`__PSCTX_START__${firstRequestId}\none\n__PSCTX_END__${firstRequestId}\n`);
 
     const firstResult = await firstExecution;
@@ -68,10 +82,10 @@ describe('PowerShellSession', () => {
 
     assert.equal(firstResult.output, 'one');
     assert.equal(firstResult.isError, false);
-    assert.equal(child.writes.length, 3);
-    assert.match(child.writes[2], /V3JpdGUtT3V0cHV0ICd0d28n/);
+    const secondPayload = consumeRequestPayload(requestDirectory);
+    assert.equal(Buffer.from(secondPayload.codeBase64, 'base64').toString('utf8'), "Write-Output 'two'");
 
-    const secondRequestId = extractRequestId(child.writes[2]);
+    const secondRequestId = secondPayload.requestId;
     child.stdout.write(`__PSCTX_START__${secondRequestId}\ntwo\n__PSCTX_END__${secondRequestId}\n`);
 
     const secondResult = await secondExecution;
@@ -82,11 +96,19 @@ describe('PowerShellSession', () => {
 
   it('marks stderr output as an execution error', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
+    const requestDirectory = createRequestDirectory();
+    const session = new PowerShellSession(
+      createOutputChannel().channel,
+      createSettings,
+      createSuccessfulSpawn(child),
+      50,
+      undefined,
+      requestDirectory
+    );
     const execution = session.execute('Get-Date');
 
     await waitForQueue();
-    const requestId = extractRequestId(child.writes[1]);
+    const requestId = consumeRequestPayload(requestDirectory).requestId;
 
     child.stderr.write('stderr failure\n');
     child.stdout.write(`__PSCTX_START__${requestId}\n__PSCTX_END__${requestId}\n`);
@@ -99,11 +121,19 @@ describe('PowerShellSession', () => {
 
   it('parses structured output metadata from the PowerShell stream', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
+    const requestDirectory = createRequestDirectory();
+    const session = new PowerShellSession(
+      createOutputChannel().channel,
+      createSettings,
+      createSuccessfulSpawn(child),
+      50,
+      undefined,
+      requestDirectory
+    );
     const execution = session.execute('Get-Process | Select-Object -First 1');
 
     await waitForQueue();
-    const requestId = extractRequestId(child.writes[1]);
+    const requestId = consumeRequestPayload(requestDirectory).requestId;
     const metadata = Buffer.from(
       JSON.stringify({
         kind: 'object',
@@ -130,7 +160,15 @@ describe('PowerShellSession', () => {
   it('restarts the active session and rejects the in-flight request', async () => {
     const child = new FakeChildProcess();
     const outputChannel = createOutputChannel();
-    const session = new PowerShellSession(outputChannel.channel, createSettings, createSuccessfulSpawn(child), 50);
+    const requestDirectory = createRequestDirectory();
+    const session = new PowerShellSession(
+      outputChannel.channel,
+      createSettings,
+      createSuccessfulSpawn(child),
+      50,
+      undefined,
+      requestDirectory
+    );
     const execution = session.execute('Get-Date');
 
     await waitForQueue();
@@ -150,6 +188,7 @@ describe('PowerShellSession', () => {
   it('uses the configured powershell executable preference', async () => {
     const spawnCalls: string[] = [];
     const outputChannel = createOutputChannel();
+    const requestDirectory = createRequestDirectory();
     const spawnProcess = ((file: string) => {
       spawnCalls.push(file);
       const child = new FakeChildProcess();
@@ -162,11 +201,14 @@ describe('PowerShellSession', () => {
       outputChannel.channel,
       () => createSettings({ powerShellExecutablePreference: 'powershell' }),
       spawnProcess,
-      50
+      50,
+      undefined,
+      requestDirectory
     );
 
     await assert.rejects(session.execute('Get-Date'), /failed to start/);
     assert.deepEqual(spawnCalls, ['powershell']);
+    session.dispose();
   });
 });
 
@@ -223,11 +265,35 @@ function createOutputChannel(): { channel: vscode.OutputChannel; text: () => str
   };
 }
 
-function extractRequestId(script: string): string {
-  const match = script.match(/__PSCTX_START__(.+?)'/);
+function consumeRequestPayload(requestDirectory: string): {
+  requestId: string;
+  codeBase64: string;
+  outputWidth: number;
+  previewItemLimit: number;
+  previewDepth: number;
+} {
+  const requestFiles = fs
+    .readdirSync(requestDirectory)
+    .filter(fileName => fileName.endsWith('.request'))
+    .sort();
 
-  assert.ok(match);
-  return match[1];
+  assert.ok(requestFiles.length > 0);
+
+  const requestFilePath = path.join(requestDirectory, requestFiles[0]);
+  const encodedRequest = fs.readFileSync(requestFilePath, 'utf8');
+  fs.rmSync(requestFilePath, { force: true });
+
+  return JSON.parse(Buffer.from(encodedRequest.trim(), 'base64').toString('utf8')) as {
+    requestId: string;
+    codeBase64: string;
+    outputWidth: number;
+    previewItemLimit: number;
+    previewDepth: number;
+  };
+}
+
+function createRequestDirectory(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-context-test-'));
 }
 
 async function waitForQueue(): Promise<void> {
