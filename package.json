@@ -5,6 +5,10 @@
   "version": "0.0.1",
   "publisher": "srejv",
   "license": "MIT",
+  "galleryBanner": {
+    "color": "#103b52",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.99.0"
   },
@@ -124,9 +128,11 @@
     "pretest": "npm run compile && npm run lint",
     "test": "npm run test:unit && npm run test:extension",
     "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
-    "test:extension": "node ./out/test/extension/runTest.js"
+    "test:extension": "node ./out/test/extension/runTest.js",
+    "package:vsix": "vsce package --allow-missing-repository"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.15.3",
     "@types/vscode": "^1.99.0",
