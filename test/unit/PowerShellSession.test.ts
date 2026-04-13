@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as vscode from 'vscode';
+import type { PowerShellContextSettings } from '../../src/configuration';
 import { EXECUTION_METADATA_MARKER } from '../../src/constants';
 import { PowerShellSession } from '../../src/powershell/PowerShellSession';
 
@@ -42,7 +43,7 @@ describe('PowerShellSession', () => {
       });
       return child as unknown as ChildProcessWithoutNullStreams;
     }) as typeof import('node:child_process').spawn;
-    const session = new PowerShellSession(outputChannel.channel, spawnProcess, 50);
+    const session = new PowerShellSession(outputChannel.channel, createSettings, spawnProcess, 50);
 
     await assert.rejects(session.execute('Get-Date'), /failed to start/);
     assert.deepEqual(spawnCalls, ['pwsh', 'powershell']);
@@ -51,7 +52,7 @@ describe('PowerShellSession', () => {
 
   it('processes queued requests sequentially', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSuccessfulSpawn(child), 50);
+    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
     const firstExecution = session.execute("Write-Output 'one'");
     const secondExecution = session.execute("Write-Output 'two'");
 
@@ -81,7 +82,7 @@ describe('PowerShellSession', () => {
 
   it('marks stderr output as an execution error', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSuccessfulSpawn(child), 50);
+    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
     const execution = session.execute('Get-Date');
 
     await waitForQueue();
@@ -98,7 +99,7 @@ describe('PowerShellSession', () => {
 
   it('parses structured output metadata from the PowerShell stream', async () => {
     const child = new FakeChildProcess();
-    const session = new PowerShellSession(createOutputChannel().channel, createSuccessfulSpawn(child), 50);
+    const session = new PowerShellSession(createOutputChannel().channel, createSettings, createSuccessfulSpawn(child), 50);
     const execution = session.execute('Get-Process | Select-Object -First 1');
 
     await waitForQueue();
@@ -125,7 +126,41 @@ describe('PowerShellSession', () => {
     });
     session.dispose();
   });
+
+  it('uses the configured powershell executable preference', async () => {
+    const spawnCalls: string[] = [];
+    const outputChannel = createOutputChannel();
+    const spawnProcess = ((file: string) => {
+      spawnCalls.push(file);
+      const child = new FakeChildProcess();
+      queueMicrotask(() => {
+        child.emit('error', new Error(`${file} failed to start`));
+      });
+      return child as unknown as ChildProcessWithoutNullStreams;
+    }) as typeof import('node:child_process').spawn;
+    const session = new PowerShellSession(
+      outputChannel.channel,
+      () => createSettings({ powerShellExecutablePreference: 'powershell' }),
+      spawnProcess,
+      50
+    );
+
+    await assert.rejects(session.execute('Get-Date'), /failed to start/);
+    assert.deepEqual(spawnCalls, ['powershell']);
+  });
 });
+
+function createSettings(overrides: Partial<PowerShellContextSettings> = {}): PowerShellContextSettings {
+  return {
+    inlineOutputMaxLength: 72,
+    previewItemLimit: 3,
+    previewDepth: 1,
+    outputChannelAutoOpen: 'errors',
+    previewPanelAutoOpen: 'structured',
+    powerShellExecutablePreference: 'auto',
+    ...overrides
+  };
+}
 
 function createSuccessfulSpawn(child: FakeChildProcess): typeof import('node:child_process').spawn {
   return ((file: string) => {

@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as os from 'node:os';
 import * as vscode from 'vscode';
+import type { PowerShellContextSettings } from '../configurationModel';
 import {
+  DEFAULT_INLINE_OUTPUT_MAX_LENGTH,
+  DEFAULT_OUTPUT_CHANNEL_AUTO_OPEN,
+  DEFAULT_POWER_SHELL_EXECUTABLE_PREFERENCE,
+  DEFAULT_PREVIEW_DEPTH,
+  DEFAULT_PREVIEW_ITEM_LIMIT,
+  DEFAULT_PREVIEW_PANEL_AUTO_OPEN,
   EXECUTION_END_MARKER,
   EXECUTION_ERROR_MARKER,
   EXECUTION_METADATA_MARKER,
@@ -25,8 +32,6 @@ interface PendingRequest {
   reject: (error: Error) => void;
 }
 
-const POWERSHELL_EXECUTABLES = ['pwsh', 'powershell'];
-
 export class PowerShellSession implements vscode.Disposable {
   private process: ChildProcessWithoutNullStreams | undefined;
   private startPromise: Promise<void> | undefined;
@@ -34,9 +39,12 @@ export class PowerShellSession implements vscode.Disposable {
   private activeRequest: PendingRequest | undefined;
   private stdoutBuffer = '';
   private stderrBuffer = '';
+  private activeExecutable: string | undefined;
+  private isStoppingProcess = false;
 
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
+    private readonly getSettings: () => PowerShellContextSettings = getDefaultSettings,
     private readonly spawnProcess: typeof spawn = spawn,
     private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS
   ) {}
@@ -58,11 +66,7 @@ export class PowerShellSession implements vscode.Disposable {
   }
 
   public dispose(): void {
-    if (this.process) {
-      this.process.stdin.end();
-      this.process.kill();
-      this.process = undefined;
-    }
+    this.stopProcess();
   }
 
   private async runNextRequest(): Promise<void> {
@@ -88,11 +92,24 @@ export class PowerShellSession implements vscode.Disposable {
     }
 
     this.activeRequest = nextRequest;
-    const script = buildEvaluationScript(nextRequest.code, nextRequest.requestId, OUTPUT_STRING_WIDTH);
+    const settings = this.getSettings();
+    const script = buildEvaluationScript(
+      nextRequest.code,
+      nextRequest.requestId,
+      OUTPUT_STRING_WIDTH,
+      settings.previewItemLimit,
+      settings.previewDepth
+    );
     this.process.stdin.write(`${script}${os.EOL}`, 'utf8');
   }
 
   private async ensureStarted(): Promise<void> {
+    const settings = this.getSettings();
+
+    if (this.process && this.activeExecutable && !getPowerShellExecutables(settings).includes(this.activeExecutable)) {
+      this.stopProcess();
+    }
+
     if (this.process) {
       return;
     }
@@ -106,8 +123,9 @@ export class PowerShellSession implements vscode.Disposable {
 
   private async startSession(): Promise<void> {
     let lastError: Error | undefined;
+    const settings = this.getSettings();
 
-    for (const executable of POWERSHELL_EXECUTABLES) {
+    for (const executable of getPowerShellExecutables(settings)) {
       try {
         await this.startWithExecutable(executable);
         this.outputChannel.appendLine(`Started PowerShell session with ${executable}.`);
@@ -138,6 +156,7 @@ export class PowerShellSession implements vscode.Disposable {
         clearTimeout(timeoutHandle);
         child.stdout.setEncoding('utf8');
         child.stderr.setEncoding('utf8');
+        this.activeExecutable = executable;
         this.attachProcess(child);
         child.stdin.write(`${buildBootstrapScript()}${os.EOL}`, 'utf8');
         child.off('error', handleError);
@@ -256,11 +275,22 @@ export class PowerShellSession implements vscode.Disposable {
   }
 
   private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
+    if (this.isStoppingProcess) {
+      this.process = undefined;
+      this.startPromise = undefined;
+      this.activeExecutable = undefined;
+      this.isStoppingProcess = false;
+      this.stdoutBuffer = '';
+      this.stderrBuffer = '';
+      return;
+    }
+
     const error = new Error(`PowerShell session exited unexpectedly (code: ${code ?? 'null'}, signal: ${signal ?? 'none'}).`);
 
     this.flushPendingBuffers();
     this.process = undefined;
     this.startPromise = undefined;
+    this.activeExecutable = undefined;
     this.outputChannel.appendLine(error.message);
 
     if (this.activeRequest) {
@@ -301,6 +331,20 @@ export class PowerShellSession implements vscode.Disposable {
 
     this.stdoutBuffer = '';
     this.stderrBuffer = '';
+  }
+
+  private stopProcess(): void {
+    if (!this.process) {
+      this.activeExecutable = undefined;
+      return;
+    }
+
+    this.isStoppingProcess = true;
+    this.process.stdin.end();
+    this.process.kill();
+    this.process = undefined;
+    this.startPromise = undefined;
+    this.activeExecutable = undefined;
   }
 }
 
@@ -347,4 +391,27 @@ function parseOutputMetadata(encodedMetadata: string): SessionOutputMetadata | u
 
 function isSessionOutputKind(value: unknown): value is SessionOutputMetadata['kind'] {
   return value === 'empty' || value === 'scalar' || value === 'dictionary' || value === 'object' || value === 'collection';
+}
+
+function getPowerShellExecutables(settings: PowerShellContextSettings): string[] {
+  if (settings.powerShellExecutablePreference === 'pwsh') {
+    return ['pwsh'];
+  }
+
+  if (settings.powerShellExecutablePreference === 'powershell') {
+    return ['powershell'];
+  }
+
+  return ['pwsh', 'powershell'];
+}
+
+function getDefaultSettings(): PowerShellContextSettings {
+  return {
+    inlineOutputMaxLength: DEFAULT_INLINE_OUTPUT_MAX_LENGTH,
+    previewItemLimit: DEFAULT_PREVIEW_ITEM_LIMIT,
+    previewDepth: DEFAULT_PREVIEW_DEPTH,
+    outputChannelAutoOpen: DEFAULT_OUTPUT_CHANNEL_AUTO_OPEN,
+    previewPanelAutoOpen: DEFAULT_PREVIEW_PANEL_AUTO_OPEN,
+    powerShellExecutablePreference: DEFAULT_POWER_SHELL_EXECUTABLE_PREFERENCE
+  };
 }

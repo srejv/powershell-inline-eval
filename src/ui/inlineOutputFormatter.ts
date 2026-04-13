@@ -1,4 +1,4 @@
-import { INLINE_OUTPUT_MAX_LENGTH } from '../constants';
+import { DEFAULT_INLINE_OUTPUT_MAX_LENGTH } from '../constants';
 import type { InlinePresentation, SessionOutputMetadata } from '../types';
 
 const ELLIPSIS = '...';
@@ -17,7 +17,7 @@ interface TableColumnRange {
 export function formatInlineOutput(
   output: string,
   metadata?: SessionOutputMetadata,
-  maxLength = INLINE_OUTPUT_MAX_LENGTH
+  maxLength = DEFAULT_INLINE_OUTPUT_MAX_LENGTH
 ): InlinePresentation {
   if (metadata?.preview.trim()) {
     return createBoundedPresentation(metadata.preview.trim(), maxLength, shouldRevealOutputChannel(metadata));

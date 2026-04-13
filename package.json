@@ -15,6 +15,7 @@
     "onCommand:powershellContext.evaluateLine",
     "onCommand:powershellContext.evaluateSelection",
     "onCommand:powershellContext.evaluateFile",
+    "onCommand:powershellContext.showLastResultPreview",
     "onCommand:powershellContext.clearInlineResult"
   ],
   "main": "./out/src/extension.js",
@@ -39,6 +40,11 @@
         "command": "powershellContext.clearInlineResult",
         "title": "Clear Inline PowerShell Result",
         "category": "PowerShell Context"
+      },
+      {
+        "command": "powershellContext.showLastResultPreview",
+        "title": "Show Last PowerShell Result Preview",
+        "category": "PowerShell Context"
       }
     ],
     "keybindings": [
@@ -54,7 +60,50 @@
         "mac": "cmd+shift+enter",
         "when": "editorTextFocus && editorLangId == powershell && editorHasSelection"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "PowerShell Context",
+      "properties": {
+        "powershellContext.preview.inlineMaxLength": {
+          "type": "number",
+          "default": 72,
+          "minimum": 16,
+          "description": "Maximum length of the inline preview before it is shortened."
+        },
+        "powershellContext.preview.itemLimit": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of object properties or collection items included in structured previews."
+        },
+        "powershellContext.preview.depth": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Maximum nesting depth used for structured object previews."
+        },
+        "powershellContext.previewPanel.autoOpen": {
+          "type": "string",
+          "enum": ["never", "structured", "expandedOutput", "always"],
+          "default": "structured",
+          "markdownDescription": "When the dedicated result preview panel should open automatically. `structured` opens it for object, dictionary, and collection results."
+        },
+        "powershellContext.outputChannel.autoOpen": {
+          "type": "string",
+          "enum": ["never", "errors", "expandedOutput", "always"],
+          "default": "errors",
+          "markdownDescription": "When the output channel should open automatically. `expandedOutput` opens it when the inline preview was shortened."
+        },
+        "powershellContext.powerShellExecutable": {
+          "type": "string",
+          "enum": ["auto", "pwsh", "powershell"],
+          "default": "auto",
+          "markdownDescription": "Choose which PowerShell executable the extension uses. `pwsh` targets PowerShell 7+, `powershell` targets Windows PowerShell 5.1, and `auto` prefers `pwsh` with fallback to `powershell`."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

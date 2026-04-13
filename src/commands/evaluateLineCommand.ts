@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
+import type {
+  OutputChannelAutoOpenMode,
+  PowerShellContextSettings,
+  PreviewPanelAutoOpenMode
+} from '../configuration';
 import type { PowerShellSession } from '../powershell/PowerShellSession';
 import { formatInlineOutput } from '../ui/inlineOutputFormatter';
 import type { InlineResultController } from '../ui/InlineResultController';
+import type { ResultPreviewPanel } from '../ui/ResultPreviewPanel';
 import {
   formatOutputChannelEntry,
   getCurrentLineExecution,
@@ -13,7 +19,9 @@ import {
 interface EvaluateLineDependencies {
   session: PowerShellSession;
   inlineResults: InlineResultController;
+  previewPanel: ResultPreviewPanel;
   outputChannel: vscode.OutputChannel;
+  getSettings: () => PowerShellContextSettings;
 }
 
 export function createEvaluateLineCommand(
@@ -77,18 +85,68 @@ function createEvaluateCommand(
 
     try {
       const result = await dependencies.session.execute(execution.code);
-      const inlinePresentation = formatInlineOutput(result.output, result.metadata);
+      const settings = dependencies.getSettings();
+      const inlinePresentation = formatInlineOutput(result.output, result.metadata, settings.inlineOutputMaxLength);
       dependencies.outputChannel.append(formatOutputChannelEntry(execution, result));
+      dependencies.previewPanel.update(execution, result);
       dependencies.inlineResults.show(editor, execution.lineNumber, inlinePresentation.text, result.output, result.isError);
 
-      if (inlinePresentation.revealOutputChannel || result.isError) {
+      if (shouldOpenPreviewPanel(result, inlinePresentation.revealOutputChannel, settings.previewPanelAutoOpen)) {
+        dependencies.previewPanel.show(execution, result, true);
+      }
+
+      if (shouldOpenOutputChannel(result.isError, inlinePresentation.revealOutputChannel, settings.outputChannelAutoOpen)) {
         dependencies.outputChannel.show(true);
       }
     } catch (error) {
+      const settings = dependencies.getSettings();
       const message = error instanceof Error ? error.message : String(error);
       dependencies.inlineResults.show(editor, execution.lineNumber, message, message, true);
       dependencies.outputChannel.appendLine(message);
-      dependencies.outputChannel.show(true);
+
+      if (shouldOpenOutputChannel(true, true, settings.outputChannelAutoOpen)) {
+        dependencies.outputChannel.show(true);
+      }
     }
   };
+}
+
+function shouldOpenPreviewPanel(
+  result: Awaited<ReturnType<PowerShellSession['execute']>>,
+  hasExpandedInlineOutput: boolean,
+  autoOpenMode: PreviewPanelAutoOpenMode
+): boolean {
+  if (autoOpenMode === 'never') {
+    return false;
+  }
+
+  if (autoOpenMode === 'always') {
+    return true;
+  }
+
+  if (autoOpenMode === 'expandedOutput') {
+    return hasExpandedInlineOutput;
+  }
+
+  return result.metadata?.kind === 'object' || result.metadata?.kind === 'dictionary' || result.metadata?.kind === 'collection';
+}
+
+function shouldOpenOutputChannel(
+  isError: boolean,
+  hasExpandedInlineOutput: boolean,
+  autoOpenMode: OutputChannelAutoOpenMode
+): boolean {
+  if (autoOpenMode === 'never') {
+    return false;
+  }
+
+  if (autoOpenMode === 'always') {
+    return true;
+  }
+
+  if (autoOpenMode === 'expandedOutput') {
+    return isError || hasExpandedInlineOutput;
+  }
+
+  return isError;
 }
