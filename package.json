@@ -122,14 +122,15 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
+    "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src test --ext .ts",
     "pretest": "npm run compile && npm run lint",
     "test": "npm run test:unit && npm run test:extension",
     "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
     "test:extension": "node ./out/test/extension/runTest.js",
-    "package:vsix": "vsce package --allow-missing-repository"
+    "package:vsix": "npm run compile && vsce package --allow-missing-repository"
   },
   "devDependencies": {
     "@vscode/vsce": "^3.6.2",
