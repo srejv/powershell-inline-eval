@@ -4,8 +4,8 @@ import type {
   PowerShellContextSettings,
   PreviewPanelAutoOpenMode
 } from '../configuration';
-import { setLastEvaluationSnapshot } from '../extensionDebugState';
 import type { PowerShellSessionLike } from '../powershell/PowerShellSession';
+import type { SessionExecutionResult } from '../types';
 import { formatInlineOutput } from '../ui/inlineOutputFormatter';
 import type { InlineResultController } from '../ui/InlineResultController';
 import type { ResultPreviewPanel } from '../ui/ResultPreviewPanel';
@@ -23,6 +23,7 @@ interface EvaluateLineDependencies {
   previewPanel: ResultPreviewPanel;
   outputChannel: vscode.OutputChannel;
   getSettings: () => PowerShellContextSettings;
+  onDidEvaluate?: (execution: LineExecutionContext, result: SessionExecutionResult) => void;
 }
 
 export function createEvaluateLineCommand(
@@ -88,7 +89,7 @@ function createEvaluateCommand(
       const result = await dependencies.session.execute(execution.code);
       const settings = dependencies.getSettings();
       const inlinePresentation = formatInlineOutput(result.output, result.metadata, settings.inlineOutputMaxLength);
-      setLastEvaluationSnapshot({ execution, result });
+      dependencies.onDidEvaluate?.(execution, result);
       dependencies.outputChannel.append(formatOutputChannelEntry(execution, result));
       dependencies.previewPanel.update(execution, result);
       dependencies.inlineResults.show(editor, execution.lineNumber, inlinePresentation.text, result.output, result.isError);
@@ -103,14 +104,11 @@ function createEvaluateCommand(
     } catch (error) {
       const settings = dependencies.getSettings();
       const message = error instanceof Error ? error.message : String(error);
-      setLastEvaluationSnapshot({
-        execution,
-        result: {
-          code: execution.code,
-          output: message,
-          isError: true,
-          durationMs: 0
-        }
+      dependencies.onDidEvaluate?.(execution, {
+        code: execution.code,
+        output: message,
+        isError: true,
+        durationMs: 0
       });
       dependencies.inlineResults.show(editor, execution.lineNumber, message, message, true);
       dependencies.outputChannel.appendLine(message);

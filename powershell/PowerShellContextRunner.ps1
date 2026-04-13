@@ -8,6 +8,11 @@ $ErrorActionPreference = 'Continue'
 function global:prompt { '' }
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+function Write-RunnerError([string]$Message) {
+  [Console]::Error.WriteLine($Message)
+  [Console]::Error.Flush()
+}
+
 function Get-PowerShellContextText([object]$Value) {
   if ($null -eq $Value) { return '(null)' }
   $text = [string]$Value
@@ -94,6 +99,7 @@ while ($true) {
       $outputWidth = [int]$request.outputWidth
       $code = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String([string]$request.codeBase64))
     } catch {
+      Write-RunnerError("REQUEST_PARSE_ERROR: $($_.Exception.Message)")
       continue
     }
 

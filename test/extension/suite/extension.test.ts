@@ -1,62 +1,8 @@
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
-import { clearSessionFactoryForTests, setSessionFactoryForTests } from '../../../src/extensionTestHooks';
 import { getExtensionDebugState } from '../../../src/extension';
 
 describe('Extension activation', () => {
-  before(async () => {
-    setSessionFactoryForTests(() => {
-      const listeners = new Set<(state: { activeExecutable: string | undefined; preferredExecutable: 'auto'; hasActiveProcess: boolean }) => void>();
-
-      return {
-        async execute(code: string) {
-          return {
-            code,
-            output: 'hello from extension test',
-            isError: false,
-            durationMs: 1,
-            metadata: {
-              kind: 'scalar',
-              preview: 'hello from extension test',
-              itemCount: 1
-            }
-          };
-        },
-        getState() {
-          return {
-            activeExecutable: 'powershell',
-            preferredExecutable: 'auto' as const,
-            hasActiveProcess: true
-          };
-        },
-        onDidChangeState(listener: (state: { activeExecutable: string | undefined; preferredExecutable: 'auto'; hasActiveProcess: boolean }) => void) {
-          listeners.add(listener);
-          return {
-            dispose: () => {
-              listeners.delete(listener);
-            }
-          };
-        },
-        restart() {
-          for (const listener of listeners) {
-            listener({
-              activeExecutable: 'powershell',
-              preferredExecutable: 'auto',
-              hasActiveProcess: true
-            });
-          }
-        },
-        dispose() {
-          listeners.clear();
-        }
-      };
-    });
-  });
-
-  after(() => {
-    clearSessionFactoryForTests();
-  });
-
   it('registers the evaluation commands', async () => {
     const extension = vscode.extensions.getExtension('srejv.powershell-context');
 
@@ -83,6 +29,7 @@ describe('Extension activation', () => {
 
     await vscode.workspace.getConfiguration('powershellContext').update('outputChannel.autoOpen', 'never', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('powershellContext').update('previewPanel.autoOpen', 'never', vscode.ConfigurationTarget.Global);
+    await vscode.workspace.getConfiguration('powershellContext').update('powerShellExecutable', 'powershell', vscode.ConfigurationTarget.Global);
 
     const document = await vscode.workspace.openTextDocument({
       language: 'powershell',
