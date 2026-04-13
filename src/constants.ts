@@ -7,6 +7,7 @@ export const EVALUATE_SELECTION_COMMAND = 'powershellContext.evaluateSelection';
 export const EVALUATE_FILE_COMMAND = 'powershellContext.evaluateFile';
 export const RESTART_SESSION_COMMAND = 'powershellContext.restartSession';
 export const CLEAR_INLINE_RESULT_COMMAND = 'powershellContext.clearInlineResult';
+export const SHOW_SESSION_INFO_COMMAND = 'powershellContext.showSessionInfo';
 export const SHOW_LAST_RESULT_PREVIEW_COMMAND = 'powershellContext.showLastResultPreview';
 export const DEFAULT_INLINE_OUTPUT_MAX_LENGTH = 72;
 export const MIN_INLINE_OUTPUT_MAX_LENGTH = 16;

@@ -29,6 +29,7 @@ PowerShell Context is a VS Code extension that evaluates PowerShell code in a pe
 ## Commands
 
 - `PowerShell Context: Restart PowerShell Session`: Restart the dedicated session and apply engine-setting changes immediately.
+- `PowerShell Context: Show PowerShell Session Info`: Show the active engine, launch order, and preview settings in the output channel.
 - `PowerShell Context: Show Last PowerShell Result Preview`: Reopen the dedicated preview panel for the latest result.
 
 ## Development

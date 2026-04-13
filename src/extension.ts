@@ -8,6 +8,7 @@ import {
   OUTPUT_CHANNEL_NAME,
   RESTART_SESSION_COMMAND,
   SETTINGS_SECTION,
+  SHOW_SESSION_INFO_COMMAND,
   SHOW_LAST_RESULT_PREVIEW_COMMAND
 } from './constants';
 import {
@@ -16,6 +17,7 @@ import {
   createEvaluateSelectionCommand
 } from './commands/evaluateLineCommand';
 import { PowerShellSession } from './powershell/PowerShellSession';
+import { formatSessionInfo } from './sessionInfo';
 import { InlineResultController } from './ui/InlineResultController';
 import { ResultPreviewPanel } from './ui/ResultPreviewPanel';
 import { SessionStatusBar } from './ui/SessionStatusBar';
@@ -69,6 +71,16 @@ export function activate(context: vscode.ExtensionContext): void {
       session.restart();
       sessionStatusBar.refresh();
       await vscode.window.showInformationMessage('PowerShell session restarted.');
+    })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(SHOW_SESSION_INFO_COMMAND, async () => {
+      const settings = getPowerShellContextSettings();
+      const info = formatSessionInfo(session.getState(), settings);
+
+      outputChannel.appendLine(info);
+      outputChannel.show(true);
+      await vscode.window.showInformationMessage('PowerShell session info was written to the output channel.');
     })
   );
   context.subscriptions.push(

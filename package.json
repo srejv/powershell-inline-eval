@@ -16,6 +16,7 @@
     "onCommand:powershellContext.evaluateSelection",
     "onCommand:powershellContext.evaluateFile",
     "onCommand:powershellContext.restartSession",
+    "onCommand:powershellContext.showSessionInfo",
     "onCommand:powershellContext.showLastResultPreview",
     "onCommand:powershellContext.clearInlineResult"
   ],
@@ -40,6 +41,11 @@
       {
         "command": "powershellContext.restartSession",
         "title": "Restart PowerShell Session",
+        "category": "PowerShell Context"
+      },
+      {
+        "command": "powershellContext.showSessionInfo",
+        "title": "Show PowerShell Session Info",
         "category": "PowerShell Context"
       },
       {
