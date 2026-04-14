@@ -16,7 +16,7 @@ export class InlineResultController implements vscode.Disposable {
       color: new vscode.ThemeColor('editorCodeLens.foreground'),
       margin: RESULT_SUFFIX_MARGIN
     },
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+    rangeBehavior: vscode.DecorationRangeBehavior.OpenOpen
   });
 
   private readonly errorDecorationType = vscode.window.createTextEditorDecorationType({
@@ -24,7 +24,7 @@ export class InlineResultController implements vscode.Disposable {
       color: new vscode.ThemeColor('errorForeground'),
       margin: RESULT_SUFFIX_MARGIN
     },
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+    rangeBehavior: vscode.DecorationRangeBehavior.OpenOpen
   });
 
   private readonly editorStates = new Map<vscode.TextEditor, EditorDecorationState>();
