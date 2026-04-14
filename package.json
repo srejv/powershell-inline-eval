@@ -1,10 +1,28 @@
 {
-  "name": "powershell-context",
-  "displayName": "PowerShell Context",
-  "description": "Evaluate the current PowerShell line and show inline results in the editor.",
+  "name": "powershell-inline-eval",
+  "displayName": "PowerShell Inline Eval",
+  "description": "Evaluate PowerShell inline in VS Code with a persistent session, structured previews, and output channel fallback.",
   "version": "0.0.1",
   "publisher": "srejv",
   "license": "MIT",
+  "markdown": "github",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srejv/powershell-inline-eval.git"
+  },
+  "homepage": "https://github.com/srejv/powershell-inline-eval#readme",
+  "bugs": {
+    "url": "https://github.com/srejv/powershell-inline-eval/issues"
+  },
+  "keywords": [
+    "powershell",
+    "pwsh",
+    "inline",
+    "evaluation",
+    "repl",
+    "scripting",
+    "terminal"
+  ],
   "galleryBanner": {
     "color": "#103b52",
     "theme": "dark"
@@ -13,16 +31,8 @@
     "vscode": "^1.99.0"
   },
   "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onCommand:powershellContext.evaluateLine",
-    "onCommand:powershellContext.evaluateSelection",
-    "onCommand:powershellContext.evaluateFile",
-    "onCommand:powershellContext.restartSession",
-    "onCommand:powershellContext.showSessionInfo",
-    "onCommand:powershellContext.showLastResultPreview",
-    "onCommand:powershellContext.clearInlineResult"
+    "Other",
+    "Programming Languages"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -30,37 +40,37 @@
       {
         "command": "powershellContext.evaluateLine",
         "title": "Evaluate Current PowerShell Line",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.evaluateSelection",
         "title": "Evaluate PowerShell Selection",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.evaluateFile",
         "title": "Evaluate PowerShell File",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.restartSession",
         "title": "Restart PowerShell Session",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.showSessionInfo",
         "title": "Show PowerShell Session Info",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.clearInlineResult",
         "title": "Clear Inline PowerShell Result",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       },
       {
         "command": "powershellContext.showLastResultPreview",
         "title": "Show Last PowerShell Result Preview",
-        "category": "PowerShell Context"
+        "category": "PowerShell Inline Eval"
       }
     ],
     "keybindings": [
@@ -78,7 +88,7 @@
       }
     ],
     "configuration": {
-      "title": "PowerShell Context",
+      "title": "PowerShell Inline Eval",
       "properties": {
         "powershellContext.preview.inlineMaxLength": {
           "type": "number",
@@ -126,11 +136,13 @@
     "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src test --ext .ts",
+    "vscode:prepublish": "npm run compile",
     "pretest": "npm run compile && npm run lint",
     "test": "npm run test:unit && npm run test:extension",
     "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
     "test:extension": "node ./out/test/extension/runTest.js",
-    "package:vsix": "npm run compile && vsce package --allow-missing-repository"
+    "package:vsix": "vsce package --allow-missing-repository",
+    "publish:vsce": "vsce publish"
   },
   "devDependencies": {
     "@vscode/vsce": "^3.6.2",

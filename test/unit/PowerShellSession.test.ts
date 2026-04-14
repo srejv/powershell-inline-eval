@@ -238,7 +238,7 @@ function createOutputChannel(): { channel: vscode.OutputChannel; text: () => str
   const writes: string[] = [];
 
   const channel = {
-    name: 'PowerShell Context Test',
+    name: 'PowerShell Inline Eval Test',
     append: (value: string) => {
       writes.push(value);
     },
@@ -293,7 +293,7 @@ function consumeRequestPayload(requestDirectory: string): {
 }
 
 function createRequestDirectory(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-context-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-inline-eval-test-'));
 }
 
 async function waitForQueue(): Promise<void> {

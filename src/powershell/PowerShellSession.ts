@@ -66,7 +66,7 @@ export class PowerShellSession implements PowerShellSessionLike {
     private readonly spawnProcess: typeof spawn = spawn,
     private readonly bootTimeoutMs = POWERSHELL_BOOT_TIMEOUT_MS,
     private readonly runnerScriptPath = path.resolve(__dirname, '../../../powershell/PowerShellContextRunner.ps1'),
-    private readonly requestDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-context-'))
+    private readonly requestDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'powershell-inline-eval-'))
   ) {}
 
   public readonly onDidChangeState = (listener: SessionStateListener): vscode.Disposable => {

@@ -6,7 +6,7 @@ export function formatSessionInfo(
   settings: PowerShellContextSettings
 ): string {
   const lines = [
-    'PowerShell Context Session Info',
+    'PowerShell Inline Eval Session Info',
     `Active executable: ${formatActiveExecutable(state.activeExecutable)}`,
     `Configured preference: ${formatPreference(settings.powerShellExecutablePreference)}`,
     `Launch order: ${getLaunchOrder(settings.powerShellExecutablePreference).join(' -> ')}`,

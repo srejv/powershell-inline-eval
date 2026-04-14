@@ -55,7 +55,7 @@ function getDisplayLabel(state: PowerShellSessionState): string {
 
 function createTooltip(state: PowerShellSessionState): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString(undefined, true);
-  tooltip.appendMarkdown('**PowerShell Context Session**\n\n');
+  tooltip.appendMarkdown('**PowerShell Inline Eval Session**\n\n');
   tooltip.appendMarkdown(`Configured engine: ${getPreferenceLabel(state.preferredExecutable)}\n\n`);
 
   if (state.activeExecutable) {

@@ -4,7 +4,7 @@ import { getExtensionDebugState } from '../../../src/extension';
 
 describe('Extension activation', () => {
   it('registers the evaluation commands', async () => {
-    const extension = vscode.extensions.getExtension('srejv.powershell-context');
+    const extension = vscode.extensions.getExtension('srejv.powershell-inline-eval');
 
     assert.ok(extension);
     await extension.activate();
@@ -22,7 +22,7 @@ describe('Extension activation', () => {
   it('executes a PowerShell line end to end', async function () {
     this.timeout(15000);
 
-    const extension = vscode.extensions.getExtension('srejv.powershell-context');
+    const extension = vscode.extensions.getExtension('srejv.powershell-inline-eval');
 
     assert.ok(extension);
     await extension.activate();

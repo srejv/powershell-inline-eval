@@ -1,4 +1,4 @@
-export const EXTENSION_NAME = 'PowerShell Context';
+export const EXTENSION_NAME = 'PowerShell Inline Eval';
 export const SETTINGS_SECTION = 'powershellContext';
 export const OUTPUT_CHANNEL_NAME = EXTENSION_NAME;
 export const PREVIEW_PANEL_TITLE = 'PowerShell Result Preview';
