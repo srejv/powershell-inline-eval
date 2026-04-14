@@ -6,6 +6,7 @@
   "publisher": "srejv",
   "license": "MIT",
   "markdown": "github",
+  "icon": "assets/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/srejv/powershell-inline-eval.git"
